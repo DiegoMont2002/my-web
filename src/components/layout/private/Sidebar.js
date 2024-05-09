@@ -1,13 +1,74 @@
-import React from 'react';
+import React, { useState } from 'react';
 import avatar from '../../../assets/img/user.png';
 import useAuth from '../../../hooks/useAuth';
 import { Global } from '../../../helpers/Global';
+import { Link } from 'react-router-dom';
+import { useForm } from '../../../hooks/useForm';
 
 export const Sidebar = () => {
 
     const { auth, counters } = useAuth();
+    const { form, changed } = useForm({});
+    const [stored, setStored] = useState("not_stored")
 
-    console.log(auth, counters);
+    const savePublication = async (e) => {
+        e.preventDefault();
+
+        const token = localStorage.getItem("token");
+
+        //Recoger datos del fomrulario
+        let newPublication = form;
+        newPublication.user = auth._id;
+
+        //Hacer un reques para guardar en la bd
+        const reques = await fetch(Global.url + "publication/save", {
+            method: "POST",
+            body: JSON.stringify(newPublication),
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": token
+            }
+        });
+
+        const data = await reques.json();
+       
+        //Mostrar mensaje de exito o error 
+        if (data.status == "success") {
+            setStored("stored");
+        } else {
+            setStored("error");
+        }
+
+        //Subir imagen
+        const fileInput = document.querySelector("#file");
+
+        if(data.status == "success" && fileInput.files[0]){
+
+            const formData = new FormData();
+            formData.append("file0", fileInput.files[0]);
+
+            const uploadReques = await fetch(Global.url + "publication/upload/" + data.publicationStored._id, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "Authorization": token
+                }           
+            });
+
+            const uploadData = await uploadReques.json();
+
+            if(uploadData.status == "success"){
+                setStored("stored");
+            }else{
+                setStored("error");
+            }
+
+            if(data.status == "success" && uploadData.status == "success"){
+                const myForm = document.querySelector("#publication-form");
+                myForm.reset();
+            }       
+        }
+    }
 
     return (
         <>
@@ -37,16 +98,16 @@ export const Sidebar = () => {
                         <div className="profile-info__stats">
 
                             <div className="stats__following">
-                                <a href="#" className="following__link">
+                                <Link to={"siguiendo/" + auth._id} className="following__link">
                                     <span className="following__title">Siguiendo</span>
                                     <span className="following__number">{counters.following}</span>
-                                </a>
+                                </Link>
                             </div>
                             <div className="stats__following">
-                                <a href="#" className="following__link">
+                                <Link to={"seguidores/" + auth._id} className="following__link">
                                     <span className="following__title">Seguidores</span>
                                     <span className="following__number">{counters.followed}</span>
-                                </a>
+                                </Link>
                             </div>
 
 
@@ -64,22 +125,29 @@ export const Sidebar = () => {
 
                     <div className="aside__container-form">
 
-                        <form className="container-form__form-post">
+                        {stored == "stored" ?
+                            <strong className='alert alert-success'>Publicado correctamente </strong>
+                            : ''}
+                        {stored == "error" ?
+                            <strong className='alert alert-danger'> No se ha pubicado nada </strong>
+                            : ''}
+
+                        <form id='publication-form' className="container-form__form-post" onSubmit={savePublication}>
 
                             <div className="form-post__inputs">
-                                <label htmlFor="post" className="form-post__label">¿Que estas pesando hoy?</label>
-                                <textarea name="post" className="form-post__textarea"></textarea>
+                                <label htmlFor="text" className="form-post__label">¿Que estas pesando hoy?</label>
+                                <textarea name="text" className="form-post__textarea" onChange={changed} />
                             </div>
 
                             <div className="form-post__inputs">
-                                <label htmlFor="image" className="form-post__label">Sube tu foto</label>
-                                <input type="file" name="image" className="form-post__image" />
+                                <label htmlFor="file" className="form-post__label">Sube tu foto</label>
+                                <input type="file" name="file0" id="file" className="form-post__image" />
                             </div>
 
-                            <input type="submit" value="Enviar" className="form-post__btn-submit" disabled />
+                            <input type="submit" value="Enviar" className="form-post__btn-submit" />
 
                         </form>
-                        
+
 
                     </div>
 
